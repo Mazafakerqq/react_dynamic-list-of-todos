@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getTodos } from '../../api';
 import { Todo } from '../../types/Todo';
 import { Loader } from '../Loader';
@@ -7,41 +7,50 @@ import { TodoModal } from '../TodoModal';
 
 export const TodoList: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasFilter, setHasFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
 
   useEffect(() => {
     getTodos().then(fetchedTodos => {
       setTodos(fetchedTodos);
-      setLoading(false);
+      setIsLoading(false);
     });
   }, []);
 
-  const filteredTodos = todos.filter(todoItem => {
-    const matchesQuery = query
-      ? todoItem.title.toLowerCase().includes(query.toLowerCase().trim())
-      : true;
-    const matchesFilter =
-      filter === 'active'
-        ? !todoItem.completed
-        : filter === 'completed'
-          ? todoItem.completed
-          : true;
+  const filteredTodos = useMemo(() => {
+    return todos.filter(todoItem => {
+      const matchesQuery = query
+        ? todoItem.title.toLowerCase().includes(query.toLowerCase().trim())
+        : true;
 
-    return matchesQuery && matchesFilter;
-  });
+      let matchesFilter;
 
-  if (loading) {
+      switch (hasFilter) {
+        case 'active':
+          matchesFilter = !todoItem.completed;
+          break;
+        case 'completed':
+          matchesFilter = todoItem.completed;
+          break;
+        default:
+          matchesFilter = true;
+      }
+
+      return matchesQuery && matchesFilter;
+    });
+  }, [query, hasFilter, todos]);
+
+  if (isLoading) {
     return <Loader />;
   }
 
   return (
     <>
       <TodoFilter
-        filter={filter}
-        setFilter={setFilter}
+        filter={hasFilter}
+        setFilter={setHasFilter}
         query={query}
         setQuery={setQuery}
       />
@@ -65,7 +74,9 @@ export const TodoList: React.FC = () => {
               key={todoItem.id}
               data-cy="todo"
               className={
-                selectedTodo === todoItem ? 'has-background-info-light' : ''
+                selectedTodo?.id === todoItem.id
+                  ? 'has-background-info-light'
+                  : ''
               }
             >
               <td className="is-vcentered">{todoItem.id}</td>
